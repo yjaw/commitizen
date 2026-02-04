@@ -6,6 +6,7 @@ import shutil
 import subprocess
 import tempfile
 from pathlib import Path
+import textwrap
 from typing import TYPE_CHECKING, TypedDict
 
 import questionary
@@ -36,6 +37,7 @@ class CommitArgs(TypedDict, total=False):
     edit: bool
     extra_cli_args: list[str]
     message_length_limit: int
+    body_length_limit: int
     no_retry: bool
     signoff: bool
     write_message_to_file: Path | None
@@ -82,6 +84,7 @@ class Commit:
 
         message = self.cz.message(answers)
         self._validate_subject_length(message)
+        message = self._rewrap_body(message)
         return message
 
     def _validate_subject_length(self, message: str) -> None:
@@ -99,6 +102,29 @@ class Commit:
             raise CommitMessageLengthExceededError(
                 f"Length of commit message exceeds limit ({len(subject)}/{message_length_limit}), subject: '{subject}'"
             )
+
+    def _rewrap_body(self, message: str) -> str:
+        body_length_limit = self.arguments.get(
+            "body_length_limit", self.config.settings.get("body_length_limit", 0)
+        )
+        # By the contract, body_length_limit is set to 0 for no limit
+        if (
+            body_length_limit is None or body_length_limit <= 0
+        ):  # do nothing for no limit
+            return message
+
+        message_parts = message.split("\n", 2)
+        if len(message_parts) < 3:
+            return message
+
+        # First line is subject, second is blank line, rest is body
+        subject = message_parts[0]
+        blank_line = message_parts[1]
+        body = message_parts[2].strip()
+        wrapped_body = textwrap.fill(
+            body, width=body_length_limit, replace_whitespace=False
+        )
+        return f"{subject}\n{blank_line}\n{wrapped_body}"
 
     def manual_edit(self, message: str) -> str:
         editor = git.get_core_editor()
