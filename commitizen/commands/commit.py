@@ -5,9 +5,9 @@ import os
 import shutil
 import subprocess
 import tempfile
-from pathlib import Path
 import textwrap
 from itertools import chain
+from pathlib import Path
 from typing import TYPE_CHECKING, TypedDict
 
 import questionary
@@ -106,7 +106,7 @@ class Commit:
 
     def _wrap_body(self, message: str) -> str:
         """
-        Wrap the body of the commit message to the specified length.
+        Wrap the body of the commit message to the --body-length-limit length.
         """
 
         body_length_limit = self.arguments.get(
@@ -120,11 +120,11 @@ class Commit:
         if len(lines) < 3:
             return message
 
-        # First line is subject, second is blank line, rest is body
-        wrapped_body_lines = [
+        # First line is subject, second is blank line, rest are body lines
+        wrapped_body_lines = chain.from_iterable(
             textwrap.wrap(line, width=body_length_limit) for line in lines[2:]
-        ]
-        return "\n".join(chain(lines[:2], chain.from_iterable(wrapped_body_lines)))
+        )
+        return "\n".join(chain(lines[:2], wrapped_body_lines))
 
     def manual_edit(self, message: str) -> str:
         editor = git.get_core_editor()
